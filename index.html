@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dukaan Bill Book</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+Bhai+2:wght@500;600;700&family=Hind+Vadodara:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: a shop counter tool. Top bar with tabs, one working area per tab; billing is a two-column ledger (items | totals) that stacks on phones. */
+:root{
+  --bg:#f3f4f1; --surface:#ffffff; --ink:#1b2220; --muted:#5d6965; --line:#dde2de;
+  --accent:#0d6656; --accent-ink:#ffffff; --accent-soft:#e1efea;
+  --due:#b42318; --due-soft:#fdecea; --warn:#8a5a00; --warn-soft:#fff3d1; --good:#1f7a4d; --good-soft:#e3f3ea;
+  --font-display:"Baloo Bhai 2", "Hind Vadodara", system-ui, sans-serif;
+  --font-body:"Hind Vadodara", "Noto Sans Gujarati", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r:10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111614; --surface:#1a211f; --ink:#e6ece9; --muted:#9aa8a3; --line:#2b3532;
+    --accent:#4fc3a7; --accent-ink:#06211b; --accent-soft:#163029;
+    --due:#ff8b7d; --due-soft:#3a1c19; --warn:#f2c14e; --warn-soft:#352b12; --good:#6fd39b; --good-soft:#15301f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111614; --surface:#1a211f; --ink:#e6ece9; --muted:#9aa8a3; --line:#2b3532;
+  --accent:#4fc3a7; --accent-ink:#06211b; --accent-soft:#163029;
+  --due:#ff8b7d; --due-soft:#3a1c19; --warn:#f2c14e; --warn-soft:#352b12; --good:#6fd39b; --good-soft:#15301f;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.45}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance;line-height:1.15}
+h2{font-size:1.35rem;font-weight:600}
+h3{font-size:1.05rem;font-weight:600}
+button,input,select,textarea{font:inherit;color:inherit}
+.num,td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.hint{font-size:.85rem;color:var(--muted);min-height:1.2em}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-inner{max-width:1180px;margin:0 auto;padding:10px 16px 0;display:flex;flex-direction:column;gap:6px}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand h1{font-size:1.4rem;font-weight:700;color:var(--accent)}
+.sync{font-size:.8rem;color:var(--muted);display:flex;align-items:center;gap:6px}
+.sync::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.sync.ok::before{background:var(--good)}
+.sync.bad::before{background:var(--due)}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav.tabs a{padding:8px 14px;text-decoration:none;color:var(--muted);font-weight:500;border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs a:hover{color:var(--ink)}
+
+main{max-width:1180px;margin:0 auto;padding:18px 16px 60px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.spread{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label,.lbl{font-size:.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+input[type=text],input[type=number],input[type=date],input[type=tel],input:not([type]),select,textarea{
+  background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+textarea{resize:vertical}
+
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:500;white-space:nowrap}
+a.btn{text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--due)}
+.btn.small{padding:4px 10px;font-size:.88rem}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn svg{width:18px;height:18px}
+.icon-btn{border:none;background:none;cursor:pointer;color:var(--muted);font-size:1.2rem;line-height:1;padding:4px 8px;border-radius:6px}
+.icon-btn:hover{color:var(--due);background:var(--due-soft)}
+a.link{color:var(--accent)}
+
+/* billing */
+.bill-head{display:grid;grid-template-columns:minmax(220px,2fr) repeat(3,minmax(130px,1fr));gap:12px;align-items:start}
+.billno{font-family:var(--font-display);font-size:1.3rem;font-weight:600;padding-top:2px}
+.bill-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+.table-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th{font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;text-align:left;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+table.items{min-width:620px}
+table.items td{padding:4px 6px}
+table.items input{padding:7px 8px}
+table.items .idx{color:var(--muted);width:32px;font-variant-numeric:tabular-nums}
+table.items .c-qty{width:90px}
+table.items .c-unit{width:60px;color:var(--muted);font-size:.9rem}
+table.items .c-rate{width:110px}
+table.items .c-amt{width:120px;font-weight:600}
+table.items tr.flag td{background:var(--warn-soft)}
+.rowflag{font-size:.78rem;color:var(--warn);padding:2px 2px 0}
+.totals{position:sticky;top:110px;display:flex;flex-direction:column;gap:10px}
+.tline{display:flex;justify-content:space-between;align-items:center;gap:10px;font-variant-numeric:tabular-nums}
+.tline input,.tline select{width:130px;text-align:right}
+.tline.grand{font-family:var(--font-display);font-size:1.6rem;font-weight:700;border-top:1px solid var(--line);padding-top:8px}
+.tline.due b{color:var(--due)}
+.actions{display:flex;flex-direction:column;gap:8px}
+.actions .btn{justify-content:center}
+.kbd{font-size:.78rem;color:var(--muted)}
+
+/* suggestions */
+#sugg{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.18);max-height:320px;overflow-y:auto;padding:4px}
+#sugg[hidden]{display:none}
+.sg{display:flex;justify-content:space-between;gap:12px;padding:7px 10px;border-radius:6px;cursor:pointer}
+.sg.on{background:var(--accent-soft)}
+.sg .nm{font-weight:600}
+.sg .gu{color:var(--muted);font-size:.9rem;margin-left:6px}
+.sg .rt{font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap}
+.sg.add{color:var(--accent);font-weight:500;border-top:1px dashed var(--line);border-radius:0 0 6px 6px}
+
+/* pills & tiles */
+.pill{display:inline-block;padding:1px 10px;border-radius:99px;font-size:.85rem;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill.due{background:var(--due-soft);color:var(--due)}
+.pill.good{background:var(--good-soft);color:var(--good)}
+.pill.zero{background:var(--bg);color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.tile .v{font-family:var(--font-display);font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums}
+.tile.due .v{color:var(--due)}
+.bar{height:8px;border-radius:4px;background:var(--accent);min-width:2px}
+.clickable{cursor:pointer}
+.clickable:hover td{background:var(--accent-soft)}
+.empty{padding:28px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:12px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.seg button{border:none;background:var(--surface);padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+
+/* modal */
+#modal{position:fixed;inset:0;z-index:50;background:rgba(10,15,13,.5);display:flex;align-items:flex-start;justify-content:center;padding:40px 12px;overflow-y:auto}
+#modal[hidden]{display:none}
+.sheet{background:var(--surface);border-radius:12px;padding:20px;width:100%;max-width:520px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.sheet.wide{max-width:820px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.scan-img{max-width:100%;max-height:260px;object-fit:contain;border-radius:8px;border:1px solid var(--line);align-self:center}
+.spinner{width:22px;height:22px;border:3px solid var(--accent-soft);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.spinner{animation-duration:3s}}
+
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:70;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;max-width:calc(100% - 32px);font-weight:500}
+#toast.due{background:var(--due);color:#fff}
+#toast[hidden]{display:none}
+
+/* invoice paper (fixed colours: it is a printed document) */
+.iv{background:#fff;color:#1b1b1b;border:1px solid #d9d9d9;border-radius:6px;padding:22px;font-family:"Hind Vadodara",system-ui,sans-serif;font-size:14px}
+.iv-h{display:flex;justify-content:space-between;gap:16px;border-bottom:2px solid #0d6656;padding-bottom:10px;flex-wrap:wrap}
+.iv-h h2{font-family:"Baloo Bhai 2","Hind Vadodara",sans-serif;font-size:1.5rem;color:#0d6656;margin:0}
+.iv-meta{text-align:right}
+.iv-to{margin:12px 0;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.iv table{width:100%;border-collapse:collapse}
+.iv th{background:#eef5f2;color:#333;text-transform:none;letter-spacing:0;font-size:.85rem;padding:6px 8px;text-align:left;border-bottom:1px solid #ccc}
+.iv td{padding:6px 8px;border-bottom:1px solid #eee}
+.iv .n{text-align:right;font-variant-numeric:tabular-nums}
+.iv-tot{margin-left:auto;width:min(300px,100%);margin-top:10px}
+.iv-tot div{display:flex;justify-content:space-between;padding:3px 0;font-variant-numeric:tabular-nums}
+.iv-tot .g{font-weight:700;font-size:1.15rem;border-top:1px solid #333;margin-top:4px;padding-top:6px}
+.iv-foot{margin-top:18px;font-size:.85rem;color:#555;text-align:center}
+
+@media print{
+  body{background:#fff}
+  .top,main,#toast,#sugg{display:none !important}
+  #modal{position:static;background:none;padding:0;overflow:visible}
+  #modal .sheet{box-shadow:none;padding:0;max-width:none}
+  #modal .sheet > :not(.iv){display:none !important}
+  .iv{border:0}
+}
+@media (max-width: 860px){
+  .bill-grid{grid-template-columns:1fr}
+  .totals{position:static}
+  .bill-head{grid-template-columns:1fr 1fr}
+  .bill-head .f-cust{grid-column:1 / -1}
+}
+@media (max-width: 420px){
+  .grid2{grid-template-columns:1fr}
+  .tline input,.tline select{width:110px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <h1 id="shop-title">Dukaan Bill Book</h1>
+      <span class="sync" id="sync">Loading…</span>
+    </div>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#bill">New bill</a>
+      <a href="#sales">Sales report</a>
+      <a href="#dues">Customers &amp; dues</a>
+      <a href="#products">Products</a>
+      <a href="#settings">Settings</a>
+    </nav>
+  </div>
+</header>
+<main id="view"></main>
+<div id="sugg" hidden role="listbox"></div>
+<div id="modal" hidden></div>
+<div id="toast" hidden role="status"></div>
+<input type="file" id="scan-file" accept="image/*" capture="environment" hidden>
+<input type="file" id="restore-file" accept=".json,application/json" hidden>
+
+<script>
+"use strict";
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
+const num = v => { if (v === null || v === undefined || v === "") return 0; const n = parseFloat(String(v).replace(/[^\d.\-]/g, "")); return isFinite(n) ? n : 0; };
+const money = n => "₹" + r2(n).toLocaleString("en-IN", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const qtyFmt = n => { n = r2(n); return Number.isInteger(n) ? String(n) : String(n); };
+const pad = n => String(n).padStart(2, "0");
+const dstr = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const today = () => dstr(new Date());
+const nice = s => { if (!s) return ""; const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("en-IN", {day: "numeric", month: "short", year: "numeric"}); };
+const byName = (a, b) => (a.name || "").localeCompare(b.name || "");
+
+const ICON_CAM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>';
+
+/* ---------- state & storage ---------- */
+const DEFAULT_SETTINGS = {shopName: "", address: "", phone: "", gstin: "", prefix: "INV-", levels: ["Retail", "Wholesale"], footer: "Thank you! Visit again."};
+const KIND = {p: "products", c: "customers", i: "invoices", y: "payments"};
+const S = {products: {}, customers: {}, invoices: {}, payments: {}, settings: {...DEFAULT_SETTINGS}};
+let col = null;           // cloud collection (per-user private)
+let canDownload = false, sampleApi = null;
+const LS_KEY = "dukaan-bill-book-v1";
+
+function saveLocal() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({products: S.products, customers: S.customers, invoices: S.invoices, payments: S.payments, settings: S.settings})); } catch (e) {}
+}
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(LS_KEY); if (!raw) return;
+    const d = JSON.parse(raw);
+    for (const k of Object.values(KIND)) S[k] = d[k] || {};
+    S.settings = {...DEFAULT_SETTINGS, ...(d.settings || {})};
+  } catch (e) {}
+}
+function setSync(text, cls) { const el = $("#sync"); el.textContent = text; el.className = "sync " + (cls || ""); }
+
+async function put(kind, obj) {
+  S[KIND[kind]][obj.id] = obj; saveLocal();
+  if (col) {
+    try { await col.doc(kind + "_" + obj.id).set({...obj, kind}); }
+    catch (e) { toast("Couldn't save to your account (" + (e && e.code || "error") + "). Kept on this device for now.", "due"); }
+  }
+}
+async function remove(kind, id) {
+  delete S[KIND[kind]][id]; saveLocal();
+  if (col) { try { await col.doc(kind + "_" + id).delete(); } catch (e) { toast("Couldn't delete from your account. Try again.", "due"); } }
+}
+async function putSettings() {
+  saveLocal(); applyShopName();
+  if (col) { try { await col.doc("settings").set({...S.settings}); } catch (e) { toast("Couldn't save settings to your account.", "due"); } }
+}
+function applySnap(snap) {
+  const n = {products: {}, customers: {}, invoices: {}, payments: {}}; let st = null;
+  for (const d of snap.docs) {
+    const v = d.data(); if (!v) continue;
+    if (d.id === "settings") { st = v; continue; }
+    const k = KIND[v.kind]; if (k && v.id) n[k][v.id] = v;
+  }
+  Object.assign(S, n);
+  S.settings = {...DEFAULT_SETTINGS, ...(st || {})};
+  if (!Array.isArray(S.settings.levels) || !S.settings.levels.length) S.settings.levels = [...DEFAULT_SETTINGS.levels];
+  saveLocal(); onDataChange();
+}
+function initStore() {
+  canDownload = true;
+  let ok = true; try { localStorage.setItem("__t", "1"); localStorage.removeItem("__t"); } catch (e) { ok = false; }
+  loadLocal(); onDataChange();
+  setSync(ok ? "Saved in this browser" : "Browser storage is blocked. Data will be lost on reload.", ok ? "ok" : "bad");
+}
+
+/* scanner settings live outside the backup so the API key is never exported */
+const API_KEY_LS = "dukaan-scan-settings";
+function scanCfg() { try { return {key: "", model: "claude-sonnet-5-5", ...JSON.parse(localStorage.getItem(API_KEY_LS) || "{}")}; } catch (e) { return {key: "", model: "claude-sonnet-5-5"}; } }
+function saveScanCfg(c) { try { localStorage.setItem(API_KEY_LS, JSON.stringify(c)); } catch (e) {} }
+
+/* ---------- domain ---------- */
+const levels = () => S.settings.levels;
+function priceFor(p, level) {
+  if (!p) return 0;
+  const pr = p.prices || {};
+  if (pr[level] !== undefined && pr[level] !== "") return num(pr[level]);
+  for (const l of levels()) if (pr[l] !== undefined && pr[l] !== "") return num(pr[l]);
+  return 0;
+}
+function custDue(cid, excludeInvoiceId) {
+  const c = S.customers[cid]; let d = num(c && c.opening);
+  for (const i of Object.values(S.invoices)) if (i.customerId === cid && i.id !== excludeInvoiceId) d += num(i.total) - num(i.received);
+  for (const p of Object.values(S.payments)) if (p.customerId === cid) d -= num(p.amount);
+  return r2(d);
+}
+function nextNo() { let m = 0; for (const i of Object.values(S.invoices)) m = Math.max(m, num(i.no)); return m + 1; }
+const invLabel = inv => (S.settings.prefix || "") + inv.no;
+function findCustomerByName(name) { const q = name.trim().toLowerCase(); return Object.values(S.customers).find(c => c.name.trim().toLowerCase() === q); }
+function duePill(v) {
+  if (v > 0.004) return `<span class="pill due">${money(v)} due</span>`;
+  if (v < -0.004) return `<span class="pill good">${money(-v)} advance</span>`;
+  return `<span class="pill zero">Settled</span>`;
+}
+
+/* ---------- ui primitives ---------- */
+let toastT;
+function toast(msg, cls) { const t = $("#toast"); t.textContent = msg; t.className = cls || ""; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, cls === "due" ? 5000 : 2600); }
+function openModal(html, wide) {
+  const m = $("#modal"); m.innerHTML = `<div class="sheet ${wide ? "wide" : ""}" role="dialog" aria-modal="true">${html}</div>`; m.hidden = false;
+  const f = m.querySelector("[autofocus]"); if (f) setTimeout(() => f.focus(), 30);
+  return m.firstElementChild;
+}
+function closeModal() { const m = $("#modal"); m.hidden = true; m.innerHTML = ""; }
+$("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal") closeModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#modal").hidden && $("#sugg").hidden) closeModal(); });
+function askConfirm(msg, okLabel = "Delete") {
+  return new Promise(res => {
+    const s = openModal(`<h3>${esc(msg)}</h3><div class="row" style="justify-content:flex-end"><button class="btn" data-a="no">Cancel</button><button class="btn primary" data-a="yes" autofocus>${esc(okLabel)}</button></div>`);
+    s.addEventListener("click", e => { const a = e.target.closest("[data-a]"); if (!a) return; closeModal(); res(a.dataset.a === "yes"); });
+  });
+}
+function offerDownload(filename, data) {
+  const ext = filename.split(".").pop().toLowerCase();
+  const type = {csv: "text/csv", json: "application/json", html: "text/html"}[ext] || "application/octet-stream";
+  const url = URL.createObjectURL(new Blob([data], {type: type + ";charset=utf-8"}));
+  const a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast("Copied. Paste it into WhatsApp."); }
+  catch (e) {
+    openModal(`<h3>Copy this text</h3><textarea rows="12" id="cp" autofocus>${esc(text)}</textarea><div class="row" style="justify-content:flex-end"><button class="btn" onclick="closeModal()">Close</button></div>`);
+    setTimeout(() => { const t = $("#cp"); t && t.select(); }, 50);
+  }
+}
+const csvCell = v => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+const toCSV = rows => "﻿" + rows.map(r => r.map(csvCell).join(",")).join("\n");
+
+/* ---------- suggestion dropdown ---------- */
+const SG = {input: null, items: [], idx: 0, source: null};
+function sgOpen(input, source) { SG.input = input; SG.source = source; sgUpdate(); }
+function sgUpdate() {
+  const el = $("#sugg");
+  if (!SG.input) return;
+  SG.items = SG.source(SG.input.value);
+  if (!SG.items.length) { el.hidden = true; return; }
+  SG.idx = Math.min(SG.idx, SG.items.length - 1); if (SG.idx < 0) SG.idx = 0;
+  el.innerHTML = SG.items.map((it, i) => `<div class="sg ${it.cls || ""} ${i === SG.idx ? "on" : ""}" data-i="${i}" role="option" aria-selected="${i === SG.idx}">${it.html}</div>`).join("");
+  sgPlace(); el.hidden = false;
+}
+function sgPlace() {
+  if (!SG.input) return;
+  const r = SG.input.getBoundingClientRect(), el = $("#sugg");
+  const w = Math.min(Math.max(r.width, 300), window.innerWidth - 16);
+  el.style.width = w + "px";
+  el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px";
+  el.style.top = (r.bottom + 4) + "px";
+}
+function sgClose() { $("#sugg").hidden = true; SG.input = null; SG.items = []; SG.idx = 0; }
+function sgIsOpen(input) { return SG.input === input && !$("#sugg").hidden && SG.items.length > 0; }
+function sgMove(d) { SG.idx = (SG.idx + d + SG.items.length) % SG.items.length; sgUpdate(); const on = $("#sugg .on"); on && on.scrollIntoView({block: "nearest"}); }
+function sgPick(i) { const it = SG.items[i ?? SG.idx]; const inp = SG.input; sgClose(); if (it) it.pick(inp); }
+$("#sugg").addEventListener("mousedown", e => { e.preventDefault(); const d = e.target.closest(".sg"); if (d) sgPick(+d.dataset.i); });
+window.addEventListener("resize", sgPlace);
+window.addEventListener("scroll", sgPlace, true);
+
+function matchProducts(q) {
+  q = q.trim().toLowerCase(); if (!q) return [];
+  const out = [];
+  for (const p of Object.values(S.products)) {
+    const n = (p.name || "").toLowerCase(), g = (p.gu || "").toLowerCase(), grp = (p.group || "").toLowerCase();
+    let s = -1;
+    if (n.startsWith(q) || g.startsWith(q)) s = 0;
+    else if (n.split(/[\s(\-/]+/).some(w => w.startsWith(q)) || g.split(/\s+/).some(w => w.startsWith(q))) s = 1;
+    else if (n.includes(q) || g.includes(q)) s = 2;
+    else if (grp.includes(q)) s = 3;
+    if (s >= 0) out.push({p, s});
+  }
+  return out.sort((a, b) => a.s - b.s || byName(a.p, b.p)).slice(0, 10).map(x => x.p);
+}
+
+/* ---------- routing ---------- */
+const ROUTES = ["bill", "sales", "dues", "products", "settings"];
+const route = () => { const h = location.hash.replace("#", ""); return ROUTES.includes(h) ? h : "bill"; };
+function renderRoute() {
+  sgClose();
+  const r = route();
+  $$("nav.tabs a").forEach(a => a.setAttribute("aria-current", a.getAttribute("href") === "#" + r ? "page" : "false"));
+  ({bill: renderBill, sales: renderSales, dues: renderDues, products: renderProducts, settings: renderSettings})[r]();
+}
+window.addEventListener("hashchange", renderRoute);
+function applyShopName() { $("#shop-title").textContent = S.settings.shopName || "Dukaan Bill Book"; }
+let firstRender = true;
+function onDataChange() {
+  applyShopName();
+  if (firstRender) { firstRender = false; renderRoute(); return; }
+  if (route() === "bill") refreshBillMeta(); else if ($("#modal").hidden) renderRoute();
+}
+
+/* =========================================================
+   NEW BILL
+   ========================================================= */
+const blankRow = () => ({key: uid(), productId: null, name: "", qty: "", unit: "", rate: "", rateEdited: false, flag: ""});
+function newDraft() { return {id: null, no: null, date: today(), customerId: null, customerName: "", level: levels()[0], rows: [blankRow()], discount: "", received: "", receivedTouched: false, mode: "Cash", note: ""}; }
+let draft = newDraft();
+
+function calc() {
+  let sub = 0;
+  for (const r of draft.rows) sub += num(r.qty) * num(r.rate);
+  sub = r2(sub);
+  const disc = r2(num(draft.discount));
+  const total = r2(Math.max(0, sub - disc));
+  const received = draft.receivedTouched ? r2(num(draft.received)) : (draft.mode === "Credit" ? 0 : total);
+  return {sub, disc, total, received, balance: r2(total - received)};
+}
+
+function rowHTML(r, i) {
+  const a = num(r.qty) * num(r.rate);
+  return `<tr data-key="${r.key}" class="${r.flag ? "flag" : ""}">
+    <td class="idx">${i + 1}</td>
+    <td><input class="it-name" value="${esc(r.name)}" placeholder="${i === 0 ? "Type item name, e.g. sug or ખાં…" : "Add item…"}" autocomplete="off" aria-label="Item ${i + 1}">${r.flag ? `<div class="rowflag">${esc(r.flag)}</div>` : ""}</td>
+    <td class="c-qty"><input class="it-qty num" inputmode="decimal" value="${esc(r.qty)}" aria-label="Count for item ${i + 1}"></td>
+    <td class="c-unit">${esc(r.unit)}</td>
+    <td class="c-rate"><input class="it-rate num" inputmode="decimal" value="${esc(r.rate)}" aria-label="Rate for item ${i + 1}"></td>
+    <td class="c-amt num">${a ? money(a) : ""}</td>
+    <td><button class="icon-btn rm" aria-label="Remove item ${i + 1}" title="Remove">×</button></td>
+  </tr>`;
+}
+
+function renderBill() {
+  if (!levels().includes(draft.level)) draft.level = levels()[0];
+  const v = $("#view");
+  v.innerHTML = `
+  <div class="spread">
+    <h2>${draft.id ? "Edit bill " + esc(S.settings.prefix + draft.no) : "New bill"}</h2>
+    <div class="row">
+      <button class="btn" id="b-scan">${ICON_CAM} Scan Gujarati list</button>
+      <button class="btn" id="b-clear">${draft.id ? "Cancel edit" : "Clear bill"}</button>
+    </div>
+  </div>
+  <div class="card bill-head">
+    <div class="field f-cust"><label for="b-cust">Customer</label>
+      <input id="b-cust" value="${esc(draft.customerName)}" placeholder="Type name or phone. Leave blank for a cash sale." autocomplete="off">
+      <div class="hint" id="b-cust-info"></div></div>
+    <div class="field"><label for="b-level">Price list</label>
+      <select id="b-level">${levels().map(l => `<option ${l === draft.level ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
+    <div class="field"><label for="b-date">Date</label><input type="date" id="b-date" value="${esc(draft.date)}"></div>
+    <div class="field"><span class="lbl">Bill no.</span><div class="billno" id="b-no"></div></div>
+  </div>
+  <div class="bill-grid">
+    <div class="card" style="padding:8px">
+      <div class="table-wrap"><table class="items">
+        <thead><tr><th>#</th><th>Item</th><th class="num">Count</th><th>Unit</th><th class="num">Rate</th><th class="num">Amount</th><th></th></tr></thead>
+        <tbody id="b-rows"></tbody>
+      </table></div>
+      <p class="kbd" style="margin:8px 6px 2px">Type to search · ↑ ↓ to choose · Enter to pick, then Enter again to move to the next item · Ctrl+S saves the bill</p>
+    </div>
+    <aside class="card totals" aria-label="Bill total">
+      <div class="tline"><span>Items</span><span id="t-count">0</span></div>
+      <div class="tline"><span>Subtotal</span><span id="t-sub"></span></div>
+      <div class="tline"><label for="t-disc">Discount (₹)</label><input id="t-disc" class="num" inputmode="decimal" value="${esc(draft.discount)}" placeholder="0"></div>
+      <div class="tline grand"><span>Total</span><span id="t-total"></span></div>
+      <div class="tline"><label for="t-mode">Payment</label>
+        <select id="t-mode">${["Cash", "UPI", "Card", "Credit"].map(m => `<option ${m === draft.mode ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+      <div class="tline"><label for="t-recv">Received now</label><input id="t-recv" class="num" inputmode="decimal"></div>
+      <div class="tline due"><span>Balance on this bill</span><b id="t-bal"></b></div>
+      <div class="tline" id="t-prev-wrap"><span>Old dues</span><span id="t-prev"></span></div>
+      <div class="tline" id="t-new-wrap"><span><b>Customer owes after bill</b></span><b id="t-new"></b></div>
+      <div class="field"><label for="t-note">Note on bill</label><input id="t-note" value="${esc(draft.note)}" placeholder="Optional"></div>
+      <div class="actions">
+        <button class="btn primary" id="b-save">Save bill</button>
+        <button class="btn" id="b-save-share">Save &amp; share / download</button>
+      </div>
+    </aside>
+  </div>`;
+  renderRows();
+  refreshBillMeta();
+  wireBill();
+}
+
+function renderRows(focusKey, focusCls) {
+  if (!draft.rows.length || draft.rows[draft.rows.length - 1].name) draft.rows.push(blankRow());
+  $("#b-rows").innerHTML = draft.rows.map(rowHTML).join("");
+  updateTotals();
+  if (focusKey) { const el = $(`tr[data-key="${focusKey}"] .${focusCls || "it-name"}`); el && el.focus(); }
+}
+function refreshBillMeta() {
+  if (!$("#b-no")) return;
+  $("#b-no").textContent = (S.settings.prefix || "") + (draft.no ?? nextNo());
+  const info = $("#b-cust-info");
+  if (draft.customerId && S.customers[draft.customerId]) {
+    const c = S.customers[draft.customerId];
+    info.innerHTML = `${esc(c.phone || "No phone")} · ${esc(c.level || levels()[0])} price · ${duePill(custDue(c.id, draft.id))}`;
+  } else if (draft.customerName.trim()) {
+    info.textContent = "New customer. They will be added when you save.";
+  } else info.textContent = "Cash sale (walk-in)";
+  updateTotals();
+}
+function updateTotals() {
+  if (!$("#t-sub")) return;
+  const t = calc();
+  $("#t-count").textContent = draft.rows.filter(r => r.name && num(r.qty) > 0).length;
+  $("#t-sub").textContent = money(t.sub);
+  $("#t-total").textContent = money(t.total);
+  const rv = $("#t-recv"); if (document.activeElement !== rv) rv.value = draft.receivedTouched ? draft.received : t.received;
+  $("#t-bal").textContent = money(t.balance);
+  const hasCust = !!(draft.customerId || draft.customerName.trim());
+  const prev = draft.customerId ? custDue(draft.customerId, draft.id) : 0;
+  $("#t-prev-wrap").hidden = !hasCust; $("#t-new-wrap").hidden = !hasCust;
+  $("#t-prev").textContent = money(prev);
+  $("#t-new").textContent = money(prev + t.balance);
+  for (const r of draft.rows) {
+    const cell = $(`tr[data-key="${r.key}"] .c-amt`); if (cell) { const a = num(r.qty) * num(r.rate); cell.textContent = a ? money(a) : ""; }
+  }
+}
+function repriceRows() {
+  for (const r of draft.rows) if (r.productId && !r.rateEdited) { const p = S.products[r.productId]; if (p) r.rate = String(priceFor(p, draft.level)); }
+}
+function pickProduct(row, p) {
+  row.productId = p.id; row.name = p.name; row.unit = p.unit || ""; row.rate = String(priceFor(p, draft.level)); row.rateEdited = false; row.flag = "";
+  if (!num(row.qty)) row.qty = "1";
+  renderRows(row.key, "it-qty");
+  const q = $(`tr[data-key="${row.key}"] .it-qty`); q && q.select();
+}
+const rowOf = el => draft.rows.find(r => r.key === el.closest("tr").dataset.key);
+
+function productSource(row) {
+  return q => {
+    const items = matchProducts(q).map(p => ({
+      html: `<span><span class="nm">${esc(p.name)}</span>${p.gu ? `<span class="gu">${esc(p.gu)}</span>` : ""}</span><span class="rt">${money(priceFor(p, draft.level))}${p.unit ? " / " + esc(p.unit) : ""}</span>`,
+      pick: () => pickProduct(row, p)
+    }));
+    if (q.trim()) items.push({cls: "add", html: `<span>+ Add “${esc(q.trim())}” to products</span>`, pick: () => productModal(null, q.trim(), p => pickProduct(row, p))});
+    return items;
+  };
+}
+function customerSource(q) {
+  q = q.trim().toLowerCase();
+  const list = Object.values(S.customers).filter(c => !q || c.name.toLowerCase().includes(q) || (c.phone || "").includes(q))
+    .sort((a, b) => { const as = a.name.toLowerCase().startsWith(q) ? 0 : 1, bs = b.name.toLowerCase().startsWith(q) ? 0 : 1; return as - bs || byName(a, b); }).slice(0, 8);
+  const items = list.map(c => ({html: `<span><span class="nm">${esc(c.name)}</span><span class="gu">${esc(c.phone || "")}</span></span><span class="rt">${duePill(custDue(c.id, draft.id))}</span>`, pick: () => pickCustomer(c)}));
+  if (q && !findCustomerByName(q)) items.push({cls: "add", html: `<span>+ New customer “${esc(q)}” (add phone and price list)</span>`, pick: inp => customerModal(null, inp.value.trim(), c => pickCustomer(c))});
+  return items;
+}
+function pickCustomer(c) {
+  draft.customerId = c.id; draft.customerName = c.name;
+  if (c.level && levels().includes(c.level)) { draft.level = c.level; $("#b-level").value = c.level; repriceRows(); renderRows(); }
+  $("#b-cust").value = c.name; refreshBillMeta();
+  const first = draft.rows.find(r => !r.name); const el = first && $(`tr[data-key="${first.key}"] .it-name`); el && el.focus();
+}
+
+function wireBill() {
+  const cust = $("#b-cust");
+  cust.addEventListener("input", () => { draft.customerName = cust.value; draft.customerId = null; const m = findCustomerByName(cust.value); if (m) draft.customerId = m.id; refreshBillMeta(); sgOpen(cust, customerSource); });
+  cust.addEventListener("focus", () => sgOpen(cust, customerSource));
+  cust.addEventListener("blur", () => setTimeout(() => { if (SG.input === cust) sgClose(); }, 150));
+  cust.addEventListener("keydown", e => keyNav(e, cust, () => { const f = draft.rows.find(r => !r.name); const el = f && $(`tr[data-key="${f.key}"] .it-name`); el && el.focus(); }));
+
+  $("#b-level").addEventListener("change", e => { draft.level = e.target.value; repriceRows(); renderRows(); });
+  $("#b-date").addEventListener("change", e => draft.date = e.target.value || today());
+  $("#t-disc").addEventListener("input", e => { draft.discount = e.target.value; updateTotals(); });
+  $("#t-mode").addEventListener("change", e => { draft.mode = e.target.value; draft.receivedTouched = false; updateTotals(); });
+  $("#t-recv").addEventListener("input", e => { draft.received = e.target.value; draft.receivedTouched = true; updateTotals(); });
+  $("#t-note").addEventListener("input", e => draft.note = e.target.value);
+  $("#b-save").addEventListener("click", () => saveBill(false));
+  $("#b-save-share").addEventListener("click", () => saveBill(true));
+  $("#b-clear").addEventListener("click", async () => {
+    if (draft.rows.some(r => r.name) && !draft.id && !(await askConfirm("Clear this bill? Items you've added will be removed.", "Clear bill"))) return;
+    draft = newDraft(); renderBill();
+  });
+  $("#b-scan").addEventListener("click", startScan);
+
+  const tb = $("#b-rows");
+  tb.addEventListener("focusin", e => {
+    if (e.target.classList.contains("it-name") && e.target.value.trim()) { const r = rowOf(e.target); sgOpen(e.target, productSource(r)); }
+  });
+  tb.addEventListener("focusout", e => { if (e.target.classList.contains("it-name")) { const t = e.target; setTimeout(() => { if (SG.input === t) sgClose(); }, 150); } });
+  tb.addEventListener("input", e => {
+    const t = e.target, r = rowOf(t); if (!r) return;
+    if (t.classList.contains("it-name")) {
+      r.name = t.value; r.productId = null; r.flag = "";
+      const tr = t.closest("tr"); tr.classList.remove("flag"); const f = tr.querySelector(".rowflag"); f && f.remove();
+      sgOpen(t, productSource(r));
+      if (t.value && draft.rows[draft.rows.length - 1] === r) { draft.rows.push(blankRow()); tb.insertAdjacentHTML("beforeend", rowHTML(draft.rows[draft.rows.length - 1], draft.rows.length - 1)); }
+    } else if (t.classList.contains("it-qty")) { r.qty = t.value; updateTotals(); }
+    else if (t.classList.contains("it-rate")) { r.rate = t.value; r.rateEdited = true; if (num(t.value) > 0 && r.flag) { r.flag = ""; t.closest("tr").classList.remove("flag"); const f = t.closest("tr").querySelector(".rowflag"); f && f.remove(); } updateTotals(); }
+  });
+  tb.addEventListener("keydown", e => {
+    const t = e.target, r = rowOf(t); if (!r) return;
+    if (t.classList.contains("it-name")) {
+      keyNav(e, t, () => { if (r.name) { const q = $(`tr[data-key="${r.key}"] .it-qty`); q && (q.focus(), q.select()); } });
+    } else if (e.key === "Enter" && (t.classList.contains("it-qty") || t.classList.contains("it-rate"))) {
+      e.preventDefault();
+      if (t.classList.contains("it-qty") && !num(r.rate)) { const rt = t.closest("tr").querySelector(".it-rate"); rt.focus(); rt.select(); return; }
+      const i = draft.rows.indexOf(r); const nx = draft.rows[i + 1];
+      if (nx) { const el = $(`tr[data-key="${nx.key}"] .it-name`); el && el.focus(); }
+    }
+  });
+  tb.addEventListener("click", e => {
+    const b = e.target.closest(".rm"); if (!b) return;
+    const r = rowOf(b); draft.rows = draft.rows.filter(x => x !== r); renderRows();
+  });
+}
+function keyNav(e, input, onEnterNoList) {
+  const open = sgIsOpen(input);
+  if (e.key === "ArrowDown" && open) { e.preventDefault(); sgMove(1); }
+  else if (e.key === "ArrowUp" && open) { e.preventDefault(); sgMove(-1); }
+  else if (e.key === "Enter") { e.preventDefault(); if (open) sgPick(); else onEnterNoList(); }
+  else if (e.key === "Escape" && open) { e.preventDefault(); sgClose(); }
+  else if (e.key === "Tab" && open && input.classList.contains("it-name") && input.value.trim()) { const it = SG.items[SG.idx]; if (it && it.cls !== "add") { e.preventDefault(); sgPick(); } }
+}
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && route() === "bill" && $("#modal").hidden) { e.preventDefault(); saveBill(false); }
+});
+
+async function saveBill(share) {
+  sgClose();
+  const rows = draft.rows.filter(r => r.name.trim());
+  if (!rows.length) { toast("Add at least one item to the bill.", "due"); return; }
+  for (const r of rows) {
+    if (!(num(r.qty) > 0)) { toast(`Enter a count for “${r.name}”.`, "due"); focusRow(r, "it-qty"); return; }
+    if (!(num(r.rate) > 0)) { toast(`Enter a rate for “${r.name}”.`, "due"); focusRow(r, "it-rate"); return; }
+  }
+  const t = calc();
+  let cid = draft.customerId;
+  const cname = draft.customerName.trim();
+  if (!cid && !cname && t.balance > 0.004) { toast("A cash sale must be fully paid. Add a customer to put the balance on their account.", "due"); $("#b-cust").focus(); return; }
+  if (!cid && cname) {
+    const ex = findCustomerByName(cname);
+    if (ex) cid = ex.id;
+    else { const c = {id: uid(), name: cname, phone: "", level: draft.level, opening: 0, address: "", createdAt: Date.now()}; await put("c", c); cid = c.id; }
+  }
+  const old = draft.id ? S.invoices[draft.id] : null;
+  const inv = {
+    id: draft.id || uid(), no: draft.no ?? nextNo(), date: draft.date || today(),
+    customerId: cid || null, customerName: cid ? S.customers[cid].name : "Cash sale", level: draft.level,
+    items: rows.map(r => ({productId: r.productId, name: r.name.trim(), qty: r2(num(r.qty)), unit: r.unit || "", rate: r2(num(r.rate)), amount: r2(num(r.qty) * num(r.rate))})),
+    subtotal: t.sub, discount: t.disc, total: t.total, received: t.received, mode: draft.mode, note: draft.note.trim(),
+    createdAt: old ? old.createdAt : Date.now(), updatedAt: Date.now()
+  };
+  $("#b-save").disabled = true; $("#b-save-share").disabled = true;
+  await put("i", inv);
+  toast(`Bill ${invLabel(inv)} saved · ${money(inv.total)}`);
+  draft = newDraft(); renderBill();
+  if (share) viewInvoice(inv.id);
+  else { const el = $(".it-name"); el && el.focus(); }
+}
+function focusRow(r, cls) { const el = $(`tr[data-key="${r.key}"] .${cls}`); el && (el.focus(), el.select && el.select()); }
+
+function editInvoice(id) {
+  const inv = S.invoices[id]; if (!inv) return;
+  draft = {id: inv.id, no: inv.no, date: inv.date, customerId: inv.customerId, customerName: inv.customerId ? (S.customers[inv.customerId]?.name || inv.customerName) : "",
+    level: inv.level || levels()[0], rows: inv.items.map(it => ({key: uid(), productId: it.productId, name: it.name, qty: String(it.qty), unit: it.unit, rate: String(it.rate), rateEdited: true, flag: ""})),
+    discount: inv.discount ? String(inv.discount) : "", received: String(inv.received), receivedTouched: true, mode: inv.mode || "Cash", note: inv.note || ""};
+  closeModal();
+  if (route() === "bill") renderBill(); else location.hash = "bill";
+}
+
+/* ---------- Gujarati list scanner ---------- */
+function startScan() { $("#scan-file").value = ""; $("#scan-file").click(); }
+
+function scanPrompt() {
+  const catalog = Object.values(S.products).sort(byName).map(p => `${p.id} | ${p.name} | ${p.gu || ""} | ${p.unit || ""}`).join("\n");
+  return `You read shopping lists for a retail shop in Gujarat, India. The photo shows a list of items, usually handwritten in Gujarati; it may mix Gujarati, Hindi and English words and may use Gujarati digits (૦૧૨૩૪૫૬૭૮૯).
+For each item line, read the item name and the quantity.
+Match each item to the shop's product list below when you are confident it is the same product (Gujarati names, spelling variants and common local names count as matches). If not confident, use null.
+
+Product list (id | English name | Gujarati name | unit):
+${catalog || "(no products yet)"}
+
+Quantity rules: convert Gujarati digits to normal digits. ½ or અડધો = 0.5, પા or પાવ = 0.25, પોણો = 0.75, સવા = 1.25, દોઢ = 1.5, અઢી = 2.5. If no quantity is written, use 1. If grams are written for a product sold by kg, convert to kg (250 ગ્રામ = 0.25). Skip lines that are not items (dates, names, totals, scribbles).
+
+Reply with JSON only, no other text:
+{"items":[{"written":"the line as written, in its original script","english":"short English name of the item","product_id":"an id from the list, or null","qty":1,"unit":"kg, g, ltr, pc, pkt, or empty"}]}`;
+}
+const blobToB64 = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(b); });
+
+/* Engine 1: Claude API with the shop's own key (best for handwriting) */
+async function scanWithClaude(img, cfg, signal) {
+  const data = await blobToB64(img);
+  const media = img.type && /^image\/(jpeg|png|webp|gif)$/.test(img.type) ? img.type : "image/jpeg";
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST", signal,
+    headers: {"content-type": "application/json", "x-api-key": cfg.key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true"},
+    body: JSON.stringify({model: cfg.model || "claude-sonnet-5-5", max_tokens: 4000, messages: [{role: "user", content: [
+      {type: "image", source: {type: "base64", media_type: media, data}}, {type: "text", text: scanPrompt()}]}]})
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw {code: "api", message: (j.error && j.error.message) || ("HTTP " + r.status)};
+  const text = (j.content || []).filter(c => c.type === "text").map(c => c.text).join("");
+  const a = text.indexOf("{"), b = text.lastIndexOf("}");
+  if (a < 0 || b < a) throw {code: "nothing"};
+  const res = JSON.parse(text.slice(a, b + 1));
+  return Array.isArray(res.items) ? res.items : [];
+}
+
+/* Engine 2: free in-browser OCR (Tesseract, Gujarati + English). Works best on clear printed or neat handwriting. */
+let tessLoading = null;
+function loadTesseract() {
+  if (window.Tesseract) return Promise.resolve();
+  if (!tessLoading) tessLoading = new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+    s.onload = res; s.onerror = () => { tessLoading = null; rej({code: "offline"}); };
+    document.head.appendChild(s);
+  });
+  return tessLoading;
+}
+async function scanWithOCR(img, onStatus) {
+  await loadTesseract();
+  const worker = await Tesseract.createWorker("guj+eng", 1, {logger: m => { if (m.status && onStatus) onStatus(m.status === "recognizing text" ? `Reading text… ${Math.round((m.progress || 0) * 100)}%` : "Preparing Gujarati reader (first time downloads ~5 MB)…"); }});
+  try { const {data} = await worker.recognize(img); return parseListText(data.text || ""); }
+  finally { await worker.terminate(); }
+}
+const GU_DIGITS = "૦૧૨૩૪૫૬૭૮૯";
+const FRAC_WORDS = {"અડધો": .5, "અડધા": .5, "અડધી": .5, "અર્ધો": .5, "પા": .25, "પાવ": .25, "પોણો": .75, "પોણા": .75, "સવા": 1.25, "દોઢ": 1.5, "અઢી": 2.5, "½": .5, "¼": .25, "¾": .75};
+const UNIT_WORDS = [[/^(કિલો|કિ\.?ગ્રા\.?|કી\.?|કિ\.?|kg|kgs|kilo)$/i, "kg"], [/^(ગ્રામ|ગ્રા\.?|gm|gms|g|gram|grams)$/i, "g"], [/^(લીટર|લિટર|લી\.?|ltr|l|litre|liter)$/i, "ltr"], [/^(પેકેટ|પેકેટ્સ|પડીકું|પડીકા|pkt|packet)$/i, "pkt"], [/^(નંગ|pc|pcs|piece)$/i, "pc"], [/^(ડઝન|dozen|dz)$/i, "dozen"]];
+function bigrams(s) { s = " " + s + " "; const m = new Map(); for (let i = 0; i < s.length - 1; i++) { const g = s.slice(i, i + 2); m.set(g, (m.get(g) || 0) + 1); } return m; }
+function dice(a, b) {
+  if (!a || !b) return 0; if (a === b) return 1;
+  const A = bigrams(a), B = bigrams(b); let inter = 0, na = 0, nb = 0;
+  A.forEach(v => na += v); B.forEach(v => nb += v);
+  A.forEach((v, k) => { if (B.has(k)) inter += Math.min(v, B.get(k)); });
+  return 2 * inter / (na + nb);
+}
+function bestProduct(name) {
+  const q = name.toLowerCase().replace(/[^\p{L}\p{M}\s]/gu, "").trim(); if (!q) return null;
+  let best = null, bs = 0;
+  for (const p of Object.values(S.products)) {
+    const cands = [(p.gu || "").toLowerCase(), (p.name || "").toLowerCase()].filter(Boolean);
+    for (const c of cands) {
+      let s = dice(q, c);
+      if (c.length >= 2 && (q.includes(c) || c.includes(q))) s = Math.max(s, .8);
+      if (s > bs) { bs = s; best = p; }
+    }
+  }
+  return bs >= .5 ? best : null;
+}
+function parseListText(text) {
+  const out = [];
+  for (let raw of text.split(/\n+/)) {
+    let line = raw.replace(/[૦-૯]/g, d => GU_DIGITS.indexOf(d)).replace(/[|_~*•·]/g, " ").trim();
+    if (line.replace(/\s/g, "").length < 2) continue;
+    line = line.replace(/^\s*\d{1,2}\s*[.)\-:]\s*/, "");          // serial numbers like "1." or "2)"
+    let qty = null, unit = "";
+    const fr = line.match(/(\d+)\s*\/\s*(\d+)/);
+    if (fr && +fr[2]) { qty = +fr[1] / +fr[2]; line = line.replace(fr[0], " "); }
+    const nm = line.match(/\d+(?:\.\d+)?/);
+    if (qty === null && nm) { qty = parseFloat(nm[0]); line = line.replace(nm[0], " "); }
+    const words = line.split(/\s+/).filter(Boolean), keep = [];
+    let fracMul = null;
+    for (const w of words) {
+      const wc = w.replace(/[.,:;\-]+$/, "");
+      if (FRAC_WORDS[wc] !== undefined) { fracMul = FRAC_WORDS[wc]; continue; }
+      const u = UNIT_WORDS.find(([re]) => re.test(wc)); if (u) { unit = u[1]; continue; }
+      keep.push(w);
+    }
+    if (qty === null) qty = fracMul ?? 1;
+    else if (fracMul === 1.25 || fracMul === .25) qty = qty + fracMul - (fracMul === 1.25 ? 1 : 0); // "સવા 2" ≈ 2.25
+    const name = keep.join(" ").replace(/[.,:;\-]+$/, "").trim();
+    if (!name || !/[\p{L}]/u.test(name)) continue;
+    const p = bestProduct(name);
+    if (p && unit === "g" && /^kg$/i.test(p.unit || "")) { qty = qty / 1000; unit = "kg"; }
+    out.push({written: raw.trim(), english: p ? "" : name, product_id: p ? p.id : null, qty: r2(qty) || 1, unit: unit || (p && p.unit) || ""});
+  }
+  return out;
+}
+
+$("#scan-file").addEventListener("change", async e => {
+  const file = e.target.files && e.target.files[0]; if (!file) return;
+  const url = URL.createObjectURL(file);
+  const cfg = scanCfg(); const useAI = !!cfg.key;
+  const s = openModal(`<h3>Reading the list</h3><img class="scan-img" src="${url}" alt="Photo of the list"><div class="row" id="scan-status"><div class="spinner"></div><span id="scan-msg">${useAI ? "Claude is reading the Gujarati items and counts…" : "Reading the list on this device…"}</span></div>
+    ${useAI ? "" : `<p class="hint">Using free on-device reading. For messy handwriting, add a Claude API key in Settings for much better results.</p>`}
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="scan-cancel">Cancel</button></div>`, true);
+  const ctrl = new AbortController();
+  s.querySelector("#scan-cancel").onclick = () => { ctrl.abort(); closeModal(); };
+  try {
+    const img = await shrinkImage(file);
+    const items = (useAI ? await scanWithClaude(img, cfg, ctrl.signal) : await scanWithOCR(img, m => { const el = $("#scan-msg"); if (el) el.textContent = m; }))
+      .filter(x => x && (x.written || x.english));
+    if (ctrl.signal.aborted) return;
+    if (!items.length) throw {code: "nothing"};
+    showScanReview(items, url);
+  } catch (err) {
+    if (ctrl.signal.aborted) return;
+    const code = err && err.code;
+    const msg = code === "api" ? "Claude API error: " + err.message + ". Check the API key and model in Settings."
+      : code === "offline" ? "Couldn't download the Gujarati reader. Check your internet connection and try again."
+      : code === "nothing" ? "No items could be read from this photo. Try a sharper, well-lit photo with the whole list in frame."
+      : "The list couldn't be read (" + (code || (err && err.message) || "error") + "). Try again with a clearer photo.";
+    const st = $("#scan-status"); if (st) st.innerHTML = `<span style="color:var(--due)">${esc(msg)}</span>`;
+    const c = $("#scan-cancel"); if (c) c.textContent = "Close";
+  }
+});
+function shrinkImage(file) {
+  return new Promise(res => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 1800, sc = Math.min(1, max / Math.max(img.width, img.height));
+      if (sc === 1 && file.size < 2.5e6) { res(file); return; }
+      const c = document.createElement("canvas"); c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => res(b || file), "image/jpeg", 0.88);
+    };
+    img.onerror = () => res(file);
+    img.src = URL.createObjectURL(file);
+  });
+}
+function showScanReview(items, url) {
+  const prods = Object.values(S.products).sort(byName);
+  const opts = sel => `<option value="">Not in product list</option>` + prods.map(p => `<option value="${p.id}" ${p.id === sel ? "selected" : ""}>${esc(p.name)}${p.gu ? " · " + esc(p.gu) : ""}</option>`).join("");
+  const s = openModal(`<div class="spread"><h3>Check the scanned items</h3><span class="muted">${items.length} found</span></div>
+    <img class="scan-img" src="${url}" alt="Photo of the list" style="max-height:160px">
+    <div class="table-wrap"><table><thead><tr><th>Written</th><th>Product</th><th class="num">Count</th></tr></thead><tbody>
+    ${items.map((it, i) => { const pid = it.product_id && S.products[it.product_id] ? it.product_id : ""; return `<tr data-i="${i}" ${pid ? "" : 'style="background:var(--warn-soft)"'}>
+      <td>${esc(it.written || "")}<div class="muted" style="font-size:.85rem">${esc(it.english || "")}</div></td>
+      <td><select class="sc-p" aria-label="Product for line ${i + 1}">${opts(pid)}</select></td>
+      <td style="width:90px"><input class="sc-q num" inputmode="decimal" value="${esc(qtyFmt(num(it.qty) || 1))}" aria-label="Count for line ${i + 1}"></td></tr>`; }).join("")}
+    </tbody></table></div>
+    <p class="hint">Yellow lines weren't matched to a product. Pick one, or keep them and type a rate on the bill.</p>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="sc-cancel">Cancel</button><button class="btn primary" id="sc-add" autofocus>Add ${items.length} items to bill</button></div>`, true);
+  s.querySelector("#sc-cancel").onclick = closeModal;
+  s.addEventListener("change", e => { if (e.target.classList.contains("sc-p")) e.target.closest("tr").style.background = e.target.value ? "" : "var(--warn-soft)"; });
+  s.querySelector("#sc-add").onclick = () => {
+    draft.rows = draft.rows.filter(r => r.name.trim());
+    $$("tbody tr", s).forEach(tr => {
+      const it = items[+tr.dataset.i]; const pid = tr.querySelector(".sc-p").value; const q = num(tr.querySelector(".sc-q").value) || 1;
+      const p = pid && S.products[pid];
+      draft.rows.push(p ? {key: uid(), productId: p.id, name: p.name, qty: qtyFmt(q), unit: p.unit || "", rate: String(priceFor(p, draft.level)), rateEdited: false, flag: ""}
+        : {key: uid(), productId: null, name: it.english || it.written, qty: qtyFmt(q), unit: it.unit || "", rate: "", rateEdited: false, flag: "Not in product list: “" + (it.written || "") + "”. Type a rate or pick a product."});
+    });
+    closeModal(); renderRows(); toast("Scanned items added. Check counts and rates before saving.");
+  };
+}
+
+/* ---------- invoice document ---------- */
+function invoiceBody(inv) {
+  const s = S.settings; const c = inv.customerId ? S.customers[inv.customerId] : null;
+  const bal = r2(inv.total - inv.received);
+  return `<div class="iv">
+    <div class="iv-h"><div><h2>${esc(s.shopName || "My Shop")}</h2>
+      <div>${esc(s.address || "")}</div><div>${s.phone ? "Phone: " + esc(s.phone) : ""}${s.gstin ? " · GSTIN: " + esc(s.gstin) : ""}</div></div>
+      <div class="iv-meta"><div style="font-weight:700;font-size:1.1rem">INVOICE</div><div>No. <b>${esc(invLabel(inv))}</b></div><div>${esc(nice(inv.date))}</div></div></div>
+    <div class="iv-to"><div><div style="color:#666;font-size:.8rem">BILL TO</div><b>${esc(c ? c.name : inv.customerName || "Cash sale")}</b>${c && c.phone ? "<div>" + esc(c.phone) + "</div>" : ""}${c && c.address ? "<div>" + esc(c.address) + "</div>" : ""}</div>
+      <div style="text-align:right"><div style="color:#666;font-size:.8rem">PRICE LIST</div>${esc(inv.level || "")}</div></div>
+    <table><thead><tr><th>#</th><th>Item</th><th class="n">Count</th><th class="n">Rate</th><th class="n">Amount</th></tr></thead><tbody>
+      ${inv.items.map((it, i) => `<tr><td>${i + 1}</td><td>${esc(it.name)}</td><td class="n">${esc(qtyFmt(it.qty))} ${esc(it.unit || "")}</td><td class="n">${money(it.rate)}</td><td class="n">${money(it.amount)}</td></tr>`).join("")}
+    </tbody></table>
+    <div class="iv-tot">
+      <div><span>Subtotal</span><span>${money(inv.subtotal)}</span></div>
+      ${inv.discount ? `<div><span>Discount</span><span>− ${money(inv.discount)}</span></div>` : ""}
+      <div class="g"><span>Total</span><span>${money(inv.total)}</span></div>
+      <div><span>Received (${esc(inv.mode || "Cash")})</span><span>${money(inv.received)}</span></div>
+      ${bal > 0.004 ? `<div><span>Balance due</span><span>${money(bal)}</span></div>` : ""}
+      ${c ? `<div style="color:#555"><span>Account balance today</span><span>${money(custDue(c.id))}</span></div>` : ""}
+    </div>
+    ${inv.note ? `<div style="margin-top:10px"><b>Note:</b> ${esc(inv.note)}</div>` : ""}
+    <div class="iv-foot">${esc(s.footer || "")}</div>
+  </div>`;
+}
+function invoiceFile(inv) {
+  const css = [...document.styleSheets[document.styleSheets.length - 1].cssRules].filter(r => r.selectorText && r.selectorText.startsWith(".iv")).map(r => r.cssText).join("\n");
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Invoice ${esc(invLabel(inv))}</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+Bhai+2:wght@600&family=Hind+Vadodara:wght@400;600&display=swap" rel="stylesheet">
+<style>body{margin:0;padding:24px;background:#f2f2f2;font-family:"Hind Vadodara",sans-serif}.wrap{max-width:780px;margin:0 auto}.bar{text-align:right;margin-bottom:12px}.bar button{font:inherit;padding:8px 18px;border:0;border-radius:6px;background:#0d6656;color:#fff;cursor:pointer}
+${css}
+@media print{body{background:#fff;padding:0}.bar{display:none}.iv{border:0}}</style></head>
+<body><div class="wrap"><div class="bar"><button onclick="window.print()">Print / Save as PDF</button></div>${invoiceBody(inv)}</div></body></html>`;
+}
+function invoiceText(inv) {
+  const s = S.settings; const bal = r2(inv.total - inv.received);
+  const lines = [`*${s.shopName || "My Shop"}*`, `Bill ${invLabel(inv)} · ${nice(inv.date)}`, `Customer: ${inv.customerId ? (S.customers[inv.customerId]?.name || inv.customerName) : "Cash sale"}`, ""];
+  inv.items.forEach((it, i) => lines.push(`${i + 1}. ${it.name}: ${qtyFmt(it.qty)}${it.unit ? " " + it.unit : ""} × ${money(it.rate)} = ${money(it.amount)}`));
+  lines.push("");
+  if (inv.discount) lines.push(`Discount: ${money(inv.discount)}`);
+  lines.push(`*Total: ${money(inv.total)}*`, `Paid: ${money(inv.received)}`);
+  if (bal > 0.004) lines.push(`Balance: ${money(bal)}`);
+  if (inv.customerId) lines.push(`Total due on account: ${money(custDue(inv.customerId))}`);
+  if (s.footer) lines.push("", s.footer);
+  return lines.join("\n");
+}
+function viewInvoice(id) {
+  const inv = S.invoices[id]; if (!inv) return;
+  const c = inv.customerId ? S.customers[inv.customerId] : null;
+  const phone = c && (c.phone || "").replace(/\D/g, "");
+  const wa = "https://wa.me/" + (phone ? (phone.length === 10 ? "91" + phone : phone) : "") + "?text=" + encodeURIComponent(invoiceText(inv));
+  const s = openModal(`${invoiceBody(inv)}
+    <div class="row" style="justify-content:space-between">
+      <div class="row">
+        <button class="btn primary" id="iv-print">Print / Save PDF</button>
+        ${canDownload ? `<button class="btn" id="iv-dl">Download invoice</button>` : ""}
+        <a class="btn" href="${esc(wa)}" target="_blank" rel="noopener">Send on WhatsApp</a>
+        <button class="btn" id="iv-copy">Copy as text</button>
+      </div>
+      <div class="row"><button class="btn" id="iv-edit">Edit</button><button class="btn danger" id="iv-del">Delete</button><button class="btn" id="iv-close" autofocus>Close</button></div>
+    </div>
+    ${canDownload ? `<p class="hint">The downloaded file opens in your browser with a Print / Save as PDF button.</p>` : ""}`, true);
+  s.querySelector("#iv-close").onclick = closeModal;
+  s.querySelector("#iv-print").onclick = () => window.print();
+  s.querySelector("#iv-copy").onclick = () => copyText(invoiceText(inv));
+  s.querySelector("#iv-edit").onclick = () => editInvoice(inv.id);
+  s.querySelector("#iv-del").onclick = async () => { if (await askConfirm(`Delete bill ${invLabel(inv)} (${money(inv.total)})? This also removes it from the customer's dues.`)) { await remove("i", inv.id); toast("Bill deleted"); renderRoute(); } };
+  const dl = s.querySelector("#iv-dl"); if (dl) dl.onclick = () => offerDownload(`Invoice-${invLabel(inv)}.html`, invoiceFile(inv));
+}
+
+/* =========================================================
+   SALES REPORT
+   ========================================================= */
+let salesRange = {preset: "month", from: "", to: ""};
+function rangeDates() {
+  const now = new Date(); const t = today();
+  switch (salesRange.preset) {
+    case "today": return [t, t];
+    case "week": { const d = new Date(now); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return [dstr(d), t]; }
+    case "month": return [dstr(new Date(now.getFullYear(), now.getMonth(), 1)), t];
+    case "last": return [dstr(new Date(now.getFullYear(), now.getMonth() - 1, 1)), dstr(new Date(now.getFullYear(), now.getMonth(), 0))];
+    case "all": return ["0000-01-01", "9999-12-31"];
+    default: return [salesRange.from || t, salesRange.to || t];
+  }
+}
+function renderSales() {
+  const [from, to] = rangeDates();
+  const invs = Object.values(S.invoices).filter(i => i.date >= from && i.date <= to).sort((a, b) => b.date.localeCompare(a.date) || b.no - a.no);
+  const pays = Object.values(S.payments).filter(p => p.date >= from && p.date <= to);
+  const total = r2(invs.reduce((s, i) => s + num(i.total), 0));
+  const recv = r2(invs.reduce((s, i) => s + num(i.received), 0));
+  const collected = r2(pays.reduce((s, p) => s + num(p.amount), 0));
+  const byDay = {}; invs.forEach(i => byDay[i.date] = r2((byDay[i.date] || 0) + num(i.total)));
+  const days = Object.entries(byDay).sort((a, b) => b[0].localeCompare(a[0]));
+  const maxDay = Math.max(1, ...days.map(d => d[1]));
+  const items = {};
+  invs.forEach(i => i.items.forEach(it => { const k = it.productId || "n:" + it.name.toLowerCase(); const o = items[k] || (items[k] = {name: it.name, unit: it.unit, qty: 0, amt: 0}); o.qty += num(it.qty); o.amt += num(it.amount); }));
+  const top = Object.values(items).sort((a, b) => b.amt - a.amt);
+  const presets = [["today", "Today"], ["week", "This week"], ["month", "This month"], ["last", "Last month"], ["all", "All time"], ["custom", "Custom"]];
+  $("#view").innerHTML = `
+  <div class="spread"><h2>Sales report</h2>
+    <div class="seg" role="group" aria-label="Date range">${presets.map(([k, l]) => `<button data-p="${k}" aria-pressed="${salesRange.preset === k}">${l}</button>`).join("")}</div></div>
+  ${salesRange.preset === "custom" ? `<div class="row card"><div class="field"><label for="sr-from">From</label><input type="date" id="sr-from" value="${esc(from)}"></div><div class="field"><label for="sr-to">To</label><input type="date" id="sr-to" value="${esc(to)}"></div></div>` : ""}
+  <p class="muted" style="margin:0">${salesRange.preset === "all" ? "All bills" : esc(nice(from)) + (from !== to ? " to " + esc(nice(to)) : "")}</p>
+  <div class="tiles">
+    <div class="tile"><div class="lbl">Total sales</div><div class="v">${money(total)}</div></div>
+    <div class="tile"><div class="lbl">Bills</div><div class="v">${invs.length}</div></div>
+    <div class="tile"><div class="lbl">Received at billing</div><div class="v">${money(recv)}</div></div>
+    <div class="tile due"><div class="lbl">Given on credit</div><div class="v">${money(total - recv)}</div></div>
+    <div class="tile"><div class="lbl">Dues collected</div><div class="v">${money(collected)}</div></div>
+  </div>
+  ${!invs.length ? `<div class="card empty"><b>No bills in this period.</b><a class="btn primary" href="#bill">Make a bill</a></div>` : `
+  <div class="grid2" style="align-items:start">
+    <div class="card"><h3 style="margin-bottom:8px">Day-wise sales</h3><div class="table-wrap"><table><thead><tr><th>Date</th><th></th><th class="num">Sales</th></tr></thead><tbody>
+      ${days.map(([d, v]) => `<tr><td style="white-space:nowrap">${esc(nice(d))}</td><td style="width:45%"><div class="bar" style="width:${(v / maxDay * 100).toFixed(1)}%"></div></td><td class="num">${money(v)}</td></tr>`).join("")}
+    </tbody></table></div></div>
+    <div class="card"><h3 style="margin-bottom:8px">Item-wise sales</h3><div class="table-wrap"><table><thead><tr><th>Item</th><th class="num">Count</th><th class="num">Amount</th></tr></thead><tbody>
+      ${top.slice(0, 25).map(o => `<tr><td>${esc(o.name)}</td><td class="num">${qtyFmt(o.qty)} ${esc(o.unit || "")}</td><td class="num">${money(o.amt)}</td></tr>`).join("")}
+    </tbody></table></div>${top.length > 25 ? `<p class="hint">Top 25 of ${top.length} items. Download the CSV for all.</p>` : ""}</div>
+  </div>
+  <div class="card"><div class="spread" style="margin-bottom:8px"><h3>Bills</h3>
+    ${canDownload ? `<div class="row"><button class="btn small" id="sr-csv">Download bills (CSV)</button><button class="btn small" id="sr-csv-items">Download item-wise (CSV)</button></div>` : ""}</div>
+    <div class="table-wrap"><table><thead><tr><th>Bill</th><th>Date</th><th>Customer</th><th>Payment</th><th class="num">Total</th><th class="num">Received</th><th class="num">Balance</th></tr></thead><tbody>
+    ${invs.map(i => { const b = r2(i.total - i.received); return `<tr class="clickable" data-inv="${i.id}" tabindex="0"><td><b>${esc(invLabel(i))}</b></td><td style="white-space:nowrap">${esc(nice(i.date))}</td><td>${esc(i.customerId ? (S.customers[i.customerId]?.name || i.customerName) : "Cash sale")}</td><td>${esc(i.mode || "")}</td><td class="num">${money(i.total)}</td><td class="num">${money(i.received)}</td><td class="num">${b > 0.004 ? `<span class="pill due">${money(b)}</span>` : "–"}</td></tr>`; }).join("")}
+    </tbody></table></div><p class="hint">Click a bill to view, download, edit or delete it.</p></div>`}`;
+  $$(".seg button").forEach(b => b.onclick = () => { salesRange.preset = b.dataset.p; if (b.dataset.p === "custom" && !salesRange.from) { const [f, t] = [dstr(new Date(Date.now() - 6 * 864e5)), today()]; salesRange.from = f; salesRange.to = t; } renderSales(); });
+  const f = $("#sr-from"), t = $("#sr-to");
+  if (f) { f.onchange = () => { salesRange.from = f.value; renderSales(); }; t.onchange = () => { salesRange.to = t.value; renderSales(); }; }
+  $$("tr[data-inv]").forEach(tr => { tr.onclick = () => viewInvoice(tr.dataset.inv); tr.onkeydown = e => { if (e.key === "Enter") viewInvoice(tr.dataset.inv); }; });
+  const c1 = $("#sr-csv"); if (c1) c1.onclick = () => offerDownload(`Sales ${from === "0000-01-01" ? "all" : from + " to " + to}.csv`, toCSV([["Bill", "Date", "Customer", "Price list", "Payment", "Items", "Subtotal", "Discount", "Total", "Received", "Balance"], ...invs.map(i => [invLabel(i), i.date, i.customerId ? (S.customers[i.customerId]?.name || i.customerName) : "Cash sale", i.level, i.mode, i.items.length, i.subtotal, i.discount, i.total, i.received, r2(i.total - i.received)])]));
+  const c2 = $("#sr-csv-items"); if (c2) c2.onclick = () => offerDownload(`Item-wise sales ${from === "0000-01-01" ? "all" : from + " to " + to}.csv`, toCSV([["Item", "Count", "Unit", "Amount"], ...top.map(o => [o.name, r2(o.qty), o.unit, r2(o.amt)])]));
+}
+
+/* =========================================================
+   CUSTOMERS & DUES
+   ========================================================= */
+let duesQuery = "", duesOnlyDue = false;
+function renderDues() {
+  const all = Object.values(S.customers).map(c => ({c, due: custDue(c.id)}));
+  const totalDue = r2(all.reduce((s, x) => s + Math.max(0, x.due), 0));
+  const withDue = all.filter(x => x.due > 0.004).length;
+  const q = duesQuery.trim().toLowerCase();
+  const list = all.filter(x => (!q || x.c.name.toLowerCase().includes(q) || (x.c.phone || "").includes(q)) && (!duesOnlyDue || x.due > 0.004)).sort((a, b) => b.due - a.due || byName(a.c, b.c));
+  const lastAct = cid => { let d = ""; for (const i of Object.values(S.invoices)) if (i.customerId === cid && i.date > d) d = i.date; for (const p of Object.values(S.payments)) if (p.customerId === cid && p.date > d) d = p.date; return d; };
+  $("#view").innerHTML = `
+  <div class="spread"><h2>Customers &amp; outstanding dues</h2><div class="row">
+    ${canDownload ? `<button class="btn" id="du-csv">Download outstanding report (CSV)</button>` : ""}
+    <button class="btn primary" id="du-add">+ Add customer</button></div></div>
+  <div class="tiles">
+    <div class="tile due"><div class="lbl">Total outstanding</div><div class="v">${money(totalDue)}</div></div>
+    <div class="tile"><div class="lbl">Customers with dues</div><div class="v">${withDue} <span class="muted" style="font-size:1rem">of ${all.length}</span></div></div>
+  </div>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px"><input id="du-q" placeholder="Search name or phone" value="${esc(duesQuery)}" style="max-width:320px">
+      <label class="row" style="gap:6px"><input type="checkbox" id="du-only" ${duesOnlyDue ? "checked" : ""}> Only customers who owe money</label></div>
+    ${!all.length ? `<div class="empty">No customers yet. They're added when you make a bill with a customer name, or with the button above.</div>` : `
+    <div class="table-wrap"><table><thead><tr><th>Customer</th><th>Phone</th><th>Price list</th><th>Last activity</th><th class="num">Outstanding</th><th></th></tr></thead><tbody>
+    ${list.map(({c, due}) => `<tr><td><a href="#dues" class="link" data-ledger="${c.id}"><b>${esc(c.name)}</b></a></td><td>${esc(c.phone || "")}</td><td>${esc(c.level || "")}</td><td>${esc(nice(lastAct(c.id)))}</td><td class="num">${duePill(due)}</td>
+      <td><div class="row" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn small" data-pay="${c.id}">Receive payment</button><button class="btn small" data-ledger="${c.id}">Ledger</button></div></td></tr>`).join("")}
+    </tbody></table></div>`}
+  </div>`;
+  const qi = $("#du-q"); qi.oninput = () => { duesQuery = qi.value; const pos = qi.selectionStart; renderDues(); const n = $("#du-q"); n.focus(); n.setSelectionRange(pos, pos); };
+  $("#du-only").onchange = e => { duesOnlyDue = e.target.checked; renderDues(); };
+  $("#du-add").onclick = () => customerModal(null, "", () => renderDues());
+  $$("[data-pay]").forEach(b => b.onclick = () => paymentModal(b.dataset.pay));
+  $$("[data-ledger]").forEach(b => b.onclick = e => { e.preventDefault(); ledgerModal(b.dataset.ledger); });
+  const csv = $("#du-csv"); if (csv) csv.onclick = () => offerDownload(`Outstanding ${today()}.csv`, toCSV([["Customer", "Phone", "Price list", "Opening balance", "Total billed", "Total paid", "Outstanding", "Last activity"],
+    ...all.sort((a, b) => b.due - a.due).map(({c, due}) => { let billed = 0, paid = 0; for (const i of Object.values(S.invoices)) if (i.customerId === c.id) { billed += num(i.total); paid += num(i.received); } for (const p of Object.values(S.payments)) if (p.customerId === c.id) paid += num(p.amount); return [c.name, c.phone, c.level, num(c.opening), r2(billed), r2(paid), due, lastAct(c.id)]; })]));
+}
+function customerModal(id, prefill, after) {
+  const c = id ? S.customers[id] : {name: prefill || "", phone: "", level: levels()[0], opening: 0, address: ""};
+  const s = openModal(`<h3>${id ? "Edit customer" : "New customer"}</h3>
+    <div class="field"><label for="cm-name">Name</label><input id="cm-name" value="${esc(c.name)}" autofocus></div>
+    <div class="grid2"><div class="field"><label for="cm-phone">Phone</label><input id="cm-phone" type="tel" value="${esc(c.phone || "")}"></div>
+      <div class="field"><label for="cm-level">Price list</label><select id="cm-level">${levels().map(l => `<option ${l === c.level ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div></div>
+    <div class="field"><label for="cm-addr">Address</label><input id="cm-addr" value="${esc(c.address || "")}"></div>
+    <div class="field"><label for="cm-open">Opening balance (old dues before using this app, ₹)</label><input id="cm-open" class="num" inputmode="decimal" value="${esc(c.opening || "")}" placeholder="0"></div>
+    <div class="row" style="justify-content:space-between">${id ? `<button class="btn danger" id="cm-del">Delete customer</button>` : "<span></span>"}
+      <div class="row"><button class="btn" id="cm-cancel">Cancel</button><button class="btn primary" id="cm-save">Save</button></div></div>`);
+  s.querySelector("#cm-cancel").onclick = closeModal;
+  s.querySelector("#cm-save").onclick = async () => {
+    const name = $("#cm-name").value.trim(); if (!name) { toast("Enter a name.", "due"); return; }
+    const dup = findCustomerByName(name); if (dup && dup.id !== id) { toast("A customer with this name already exists.", "due"); return; }
+    const obj = {...(id ? S.customers[id] : {id: uid(), createdAt: Date.now()}), name, phone: $("#cm-phone").value.trim(), level: $("#cm-level").value, address: $("#cm-addr").value.trim(), opening: r2(num($("#cm-open").value))};
+    closeModal(); await put("c", obj); toast("Customer saved"); after && after(obj);
+  };
+  const d = s.querySelector("#cm-del");
+  if (d) d.onclick = async () => {
+    const used = Object.values(S.invoices).some(i => i.customerId === id) || Object.values(S.payments).some(p => p.customerId === id);
+    if (used) { toast("This customer has bills or payments, so they can't be deleted.", "due"); return; }
+    if (await askConfirm(`Delete ${c.name}?`)) { await remove("c", id); renderRoute(); }
+  };
+}
+function paymentModal(cid, after) {
+  const c = S.customers[cid]; const due = custDue(cid);
+  const s = openModal(`<h3>Receive payment from ${esc(c.name)}</h3><p class="muted" style="margin:0">Outstanding now: ${duePill(due)}</p>
+    <div class="grid2"><div class="field"><label for="pm-amt">Amount (₹)</label><input id="pm-amt" class="num" inputmode="decimal" value="${due > 0 ? due : ""}" autofocus></div>
+      <div class="field"><label for="pm-date">Date</label><input id="pm-date" type="date" value="${today()}"></div></div>
+    <div class="grid2"><div class="field"><label for="pm-mode">Mode</label><select id="pm-mode"><option>Cash</option><option>UPI</option><option>Cheque</option><option>Bank transfer</option></select></div>
+      <div class="field"><label for="pm-note">Note</label><input id="pm-note" placeholder="Optional"></div></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="pm-cancel">Cancel</button><button class="btn primary" id="pm-save">Save payment</button></div>`);
+  setTimeout(() => { const a = $("#pm-amt"); a && a.select(); }, 40);
+  s.querySelector("#pm-cancel").onclick = closeModal;
+  s.querySelector("#pm-save").onclick = async () => {
+    const amt = r2(num($("#pm-amt").value)); if (!(amt > 0)) { toast("Enter the amount received.", "due"); return; }
+    const p = {id: uid(), customerId: cid, amount: amt, date: $("#pm-date").value || today(), mode: $("#pm-mode").value, note: $("#pm-note").value.trim(), createdAt: Date.now()};
+    closeModal(); await put("y", p); toast(`${money(amt)} received from ${c.name}`); after ? after() : renderRoute();
+  };
+}
+function ledgerModal(cid) {
+  const c = S.customers[cid]; if (!c) return;
+  const ent = [];
+  Object.values(S.invoices).filter(i => i.customerId === cid).forEach(i => ent.push({date: i.date, t: i.createdAt || 0, kind: "inv", id: i.id, text: "Bill " + invLabel(i), debit: num(i.total), credit: num(i.received)}));
+  Object.values(S.payments).filter(p => p.customerId === cid).forEach(p => ent.push({date: p.date, t: p.createdAt || 0, kind: "pay", id: p.id, text: "Payment received" + (p.mode ? " (" + p.mode + ")" : "") + (p.note ? " · " + p.note : ""), debit: 0, credit: num(p.amount)}));
+  ent.sort((a, b) => a.date.localeCompare(b.date) || a.t - b.t);
+  let bal = num(c.opening);
+  const rows = ent.map(e => { bal = r2(bal + e.debit - e.credit); return {...e, bal}; });
+  const s = openModal(`<div class="spread"><h3>${esc(c.name)} · ledger</h3>${duePill(custDue(cid))}</div>
+    <p class="muted" style="margin:0">${esc(c.phone || "No phone")} · ${esc(c.level || "")} price list</p>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Details</th><th class="num">Billed</th><th class="num">Paid</th><th class="num">Balance</th><th></th></tr></thead><tbody>
+      <tr><td></td><td class="muted">Opening balance</td><td></td><td></td><td class="num">${money(num(c.opening))}</td><td></td></tr>
+      ${rows.map(e => `<tr><td style="white-space:nowrap">${esc(nice(e.date))}</td><td>${e.kind === "inv" ? `<a href="#dues" class="link" data-v="${e.id}">${esc(e.text)}</a>` : esc(e.text)}</td><td class="num">${e.debit ? money(e.debit) : ""}</td><td class="num">${e.credit ? money(e.credit) : ""}</td><td class="num"><b>${money(e.bal)}</b></td><td>${e.kind === "pay" ? `<button class="icon-btn" data-delpay="${e.id}" aria-label="Delete payment" title="Delete payment">×</button>` : ""}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="row" style="justify-content:space-between"><div class="row"><button class="btn primary" id="lg-pay">Receive payment</button><button class="btn" id="lg-edit">Edit customer</button>
+      ${c.phone ? `<a class="btn" target="_blank" rel="noopener" href="${esc("https://wa.me/" + ((c.phone || "").replace(/\D/g, "").length === 10 ? "91" : "") + (c.phone || "").replace(/\D/g, "") + "?text=" + encodeURIComponent(`Namaste ${c.name}, your outstanding balance at ${S.settings.shopName || "our shop"} is ${money(custDue(cid))}. Thank you.`))}">Send due reminder</a>` : ""}</div>
+      <button class="btn" id="lg-close" autofocus>Close</button></div>`, true);
+  s.querySelector("#lg-close").onclick = () => { closeModal(); renderRoute(); };
+  s.querySelector("#lg-pay").onclick = () => paymentModal(cid, () => ledgerModal(cid));
+  s.querySelector("#lg-edit").onclick = () => customerModal(cid, "", () => renderRoute());
+  $$("[data-v]", s).forEach(a => a.onclick = e => { e.preventDefault(); viewInvoice(a.dataset.v); });
+  $$("[data-delpay]", s).forEach(b => b.onclick = async () => { const p = S.payments[b.dataset.delpay]; if (await askConfirm(`Delete payment of ${money(p.amount)} on ${nice(p.date)}?`)) { await remove("y", p.id); ledgerModal(cid); } });
+}
+
+/* =========================================================
+   PRODUCTS
+   ========================================================= */
+let prodQuery = "";
+function renderProducts() {
+  const L = levels();
+  const q = prodQuery.trim().toLowerCase();
+  const all = Object.values(S.products).sort(byName);
+  const list = q ? all.filter(p => (p.name || "").toLowerCase().includes(q) || (p.gu || "").includes(q) || (p.group || "").toLowerCase().includes(q)) : all;
+  $("#view").innerHTML = `
+  <div class="spread"><h2>Products &amp; prices <span class="muted" style="font-size:1rem">(${all.length})</span></h2>
+    <div class="row"><button class="btn" id="pr-bulk">Paste a list</button><button class="btn primary" id="pr-add">+ Add product</button></div></div>
+  <div class="card">
+    ${!all.length ? `<div class="empty"><b>No products yet.</b><span>Add your products with a price for each price list (${L.map(esc).join(", ")}). Adding the Gujarati name helps the list scanner match items.</span>
+      <div class="row" style="justify-content:center"><button class="btn primary" id="pr-add2">+ Add product</button><button class="btn" id="pr-sample">Load 22 sample grocery products</button></div></div>` : `
+    <div class="row" style="margin-bottom:10px"><input id="pr-q" placeholder="Search products" value="${esc(prodQuery)}" style="max-width:320px"></div>
+    <div class="table-wrap"><table><thead><tr><th>Product</th><th>Group</th><th>Unit</th>${L.map(l => `<th class="num">${esc(l)}</th>`).join("")}<th></th></tr></thead><tbody>
+    ${list.map(p => `<tr class="clickable" data-p="${p.id}" tabindex="0"><td><b>${esc(p.name)}</b>${p.gu ? `<div class="muted">${esc(p.gu)}</div>` : ""}</td><td>${esc(p.group || "")}</td><td>${esc(p.unit || "")}</td>
+      ${L.map(l => `<td class="num">${p.prices && p.prices[l] !== undefined && p.prices[l] !== "" ? money(p.prices[l]) : '<span class="muted">–</span>'}</td>`).join("")}<td class="num"><span class="link">Edit</span></td></tr>`).join("")}
+    </tbody></table></div>`}
+  </div>`;
+  const qi = $("#pr-q"); if (qi) qi.oninput = () => { prodQuery = qi.value; const pos = qi.selectionStart; renderProducts(); const n = $("#pr-q"); n.focus(); n.setSelectionRange(pos, pos); };
+  $("#pr-add").onclick = () => productModal(null, "", () => renderProducts());
+  const a2 = $("#pr-add2"); if (a2) a2.onclick = () => productModal(null, "", () => renderProducts());
+  $("#pr-bulk").onclick = bulkModal;
+  const sm = $("#pr-sample"); if (sm) sm.onclick = loadSample;
+  $$("tr[data-p]").forEach(tr => { tr.onclick = () => productModal(tr.dataset.p, "", () => renderProducts()); tr.onkeydown = e => { if (e.key === "Enter") tr.onclick(); }; });
+}
+function productModal(id, prefill, after) {
+  const L = levels();
+  const p = id ? S.products[id] : {name: prefill || "", gu: "", unit: "kg", group: "", prices: {}};
+  const isGu = /[઀-૿]/.test(prefill || "");
+  if (!id && isGu) { p.gu = prefill; p.name = ""; }
+  const s = openModal(`<h3>${id ? "Edit product" : "New product"}</h3>
+    <div class="grid2"><div class="field"><label for="pm-name">Name (English)</label><input id="pm-name" value="${esc(p.name)}" ${isGu ? "" : "autofocus"}></div>
+      <div class="field"><label for="pm-gu">Gujarati name</label><input id="pm-gu" value="${esc(p.gu || "")}" placeholder="e.g. ખાંડ" ${isGu ? "autofocus" : ""}></div></div>
+    <div class="grid2"><div class="field"><label for="pm-unit">Unit</label><input id="pm-unit" list="units" value="${esc(p.unit || "")}"><datalist id="units"><option>kg</option><option>g</option><option>ltr</option><option>pc</option><option>pkt</option><option>box</option><option>dozen</option><option>bag</option></datalist></div>
+      <div class="field"><label for="pm-group">Group (optional)</label><input id="pm-group" value="${esc(p.group || "")}" placeholder="e.g. Dal, Masala, Oil"></div></div>
+    <div><span class="lbl">Price per unit for each price list (₹)</span>
+      <div class="grid2" style="margin-top:6px">${L.map((l, i) => `<div class="field"><label for="pm-pr-${i}">${esc(l)}</label><input id="pm-pr-${i}" class="num" inputmode="decimal" value="${esc(p.prices && p.prices[l] !== undefined ? p.prices[l] : "")}"></div>`).join("")}</div>
+      <p class="hint">Add or rename price lists in Settings.</p></div>
+    <div class="row" style="justify-content:space-between">${id ? `<button class="btn danger" id="pm-del">Delete</button>` : "<span></span>"}
+      <div class="row"><button class="btn" id="pm-cancel">Cancel</button><button class="btn primary" id="pm-save">Save product</button></div></div>`);
+  s.querySelector("#pm-cancel").onclick = closeModal;
+  s.querySelector("#pm-save").onclick = async () => {
+    const name = $("#pm-name").value.trim() || $("#pm-gu").value.trim();
+    if (!name) { toast("Enter a product name.", "due"); return; }
+    const prices = {...(p.prices || {})};
+    L.forEach((l, i) => { const v = $("#pm-pr-" + i).value.trim(); if (v === "") delete prices[l]; else prices[l] = r2(num(v)); });
+    if (!L.some(l => prices[l] > 0)) { toast("Enter at least one price.", "due"); return; }
+    const obj = {...(id ? S.products[id] : {id: uid(), createdAt: Date.now()}), name, gu: $("#pm-gu").value.trim(), unit: $("#pm-unit").value.trim(), group: $("#pm-group").value.trim(), prices};
+    closeModal(); await put("p", obj); toast("Product saved"); after && after(obj);
+  };
+  const d = s.querySelector("#pm-del");
+  if (d) d.onclick = async () => { if (await askConfirm(`Delete ${p.name}? Old bills keep their item lines.`)) { await remove("p", id); renderRoute(); } };
+}
+function bulkModal() {
+  const L = levels();
+  const s = openModal(`<h3>Paste a product list</h3>
+    <p class="muted" style="margin:0">One product per line, separated by commas:<br><code>English name, Gujarati name, unit, ${L.map(l => l + " price").join(", ")}</code></p>
+    <textarea id="bk" rows="10" autofocus placeholder="Sugar, ખાંડ, kg, 44, 42&#10;Toor Dal, તુવેર દાળ, kg, 160, 150"></textarea>
+    <p class="hint">Products with the same English name are updated instead of added twice.</p>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="bk-cancel">Cancel</button><button class="btn primary" id="bk-go">Add products</button></div>`);
+  s.querySelector("#bk-cancel").onclick = closeModal;
+  s.querySelector("#bk-go").onclick = async () => {
+    const lines = $("#bk").value.split("\n").map(l => l.trim()).filter(Boolean);
+    const recs = [];
+    for (const line of lines) {
+      const parts = line.split(/[,\t]/).map(x => x.trim());
+      if (!parts[0] && !parts[1]) continue;
+      const prices = {}; L.forEach((l, i) => { const v = parts[3 + i]; if (v !== undefined && v !== "" && isFinite(num(v))) prices[l] = r2(num(v)); });
+      const ex = Object.values(S.products).find(p => p.name.toLowerCase() === (parts[0] || parts[1]).toLowerCase());
+      recs.push({...(ex || {id: uid(), createdAt: Date.now()}), name: parts[0] || parts[1], gu: parts[1] || (ex && ex.gu) || "", unit: parts[2] || (ex && ex.unit) || "", group: ex ? ex.group || "" : "", prices: {...(ex ? ex.prices : {}), ...prices}});
+    }
+    if (!recs.length) { toast("Nothing to add. Check the format.", "due"); return; }
+    $("#bk-go").disabled = true; $("#bk-go").textContent = "Saving…";
+    for (const r of recs) await put("p", r);
+    closeModal(); toast(`${recs.length} products saved`); renderRoute();
+  };
+}
+async function loadSample() {
+  const L = levels(); const a = L[0], b = L[1];
+  const rows = [["Sugar","ખાંડ","kg","Grains & Sugar",44,42],["Toor Dal","તુવેર દાળ","kg","Dal",160,150],["Moong Dal","મગની દાળ","kg","Dal",130,122],["Chana Dal","ચણાની દાળ","kg","Dal",100,94],
+    ["Wheat Flour","ઘઉંનો લોટ","kg","Grains & Sugar",38,35],["Rice (Kolam)","ચોખા","kg","Grains & Sugar",60,55],["Besan","બેસન","kg","Grains & Sugar",90,84],["Poha","પૌંઆ","kg","Grains & Sugar",60,55],
+    ["Groundnut Oil","સીંગતેલ","ltr","Oil & Ghee",190,180],["Ghee","ઘી","kg","Oil & Ghee",640,610],["Jaggery","ગોળ","kg","Grains & Sugar",60,55],["Tea Powder","ચા","kg","Beverages",520,490],
+    ["Turmeric Powder","હળદર","kg","Masala",240,220],["Red Chilli Powder","મરચું","kg","Masala",320,300],["Cumin","જીરું","kg","Masala",480,450],["Mustard Seeds","રાઈ","kg","Masala",120,110],
+    ["Salt","મીઠું","pkt","Masala",25,22],["Milk","દૂધ","ltr","Dairy",66,64],["Bath Soap","નહાવાનો સાબુ","pc","Household",40,36],["Washing Powder","વોશિંગ પાવડર","kg","Household",110,100],
+    ["Glucose Biscuits","બિસ્કિટ","pkt","Snacks",10,9],["Matchbox","માચીસ","pkt","Household",10,9]];
+  const btn = $("#pr-sample"); if (btn) { btn.disabled = true; btn.textContent = "Adding…"; }
+  for (const r of rows) { const prices = {[a]: r[4]}; if (b) prices[b] = r[5]; await put("p", {id: uid(), name: r[0], gu: r[1], unit: r[2], group: r[3], prices, sample: true, createdAt: Date.now()}); }
+  toast("Sample products added. Edit or delete them any time."); renderRoute();
+}
+
+/* =========================================================
+   SETTINGS
+   ========================================================= */
+function renderSettings() {
+  const s = S.settings;
+  $("#view").innerHTML = `
+  <h2>Settings</h2>
+  <div class="grid2" style="align-items:start">
+    <div class="card" style="display:flex;flex-direction:column;gap:12px"><h3>Shop details (printed on invoices)</h3>
+      <div class="field"><label for="st-name">Shop name</label><input id="st-name" value="${esc(s.shopName)}" placeholder="e.g. Shree Ganesh Kirana Stores"></div>
+      <div class="field"><label for="st-addr">Address</label><input id="st-addr" value="${esc(s.address)}"></div>
+      <div class="grid2"><div class="field"><label for="st-phone">Phone</label><input id="st-phone" value="${esc(s.phone)}"></div>
+        <div class="field"><label for="st-gst">GSTIN (optional)</label><input id="st-gst" value="${esc(s.gstin)}"></div></div>
+      <div class="grid2"><div class="field"><label for="st-prefix">Bill number prefix</label><input id="st-prefix" value="${esc(s.prefix)}"></div>
+        <div class="field"><label for="st-foot">Invoice footer</label><input id="st-foot" value="${esc(s.footer)}"></div></div>
+      <div><button class="btn primary" id="st-save">Save shop details</button></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card" style="display:flex;flex-direction:column;gap:10px"><h3>Price lists</h3>
+        <p class="muted" style="margin:0">Each product can have a different price in each list. Pick the list on a bill, or set a default list per customer.</p>
+        <div id="lv-list" style="display:flex;flex-direction:column;gap:8px">
+          ${s.levels.map((l, i) => `<div class="row" style="flex-wrap:nowrap"><input value="${esc(l)}" data-lv="${i}" aria-label="Price list ${i + 1} name">${s.levels.length > 1 ? `<button class="icon-btn" data-lvdel="${i}" aria-label="Remove ${esc(l)}" title="Remove">×</button>` : ""}</div>`).join("")}
+        </div>
+        <div class="row"><button class="btn small" id="lv-add">+ Add price list</button><button class="btn small primary" id="lv-save">Save price lists</button></div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;gap:10px"><h3>Backup</h3>
+        <p class="muted" style="margin:0">Your data is saved in this browser on this device. Clearing browser data deletes it, so download a backup regularly. To move to another phone or computer, download a backup here and restore it there.</p>
+        <div class="row">${canDownload ? `<button class="btn small" id="bk-dl">Download backup</button>` : ""}<button class="btn small" id="bk-up">Restore from backup</button></div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;gap:10px"><h3>Gujarati list scanner</h3>
+        <p class="muted" style="margin:0">Without a key, lists are read for free on this device. That works for printed or neat lists. For handwritten lists, add a Claude API key from console.anthropic.com. Each scan then costs a small amount on your Anthropic account.</p>
+        <div class="field"><label for="sc-key">Claude API key (optional)</label><input id="sc-key" type="password" autocomplete="off" placeholder="sk-ant-…" value="${esc(scanCfg().key)}"></div>
+        <div class="field"><label for="sc-model">Model</label><input id="sc-model" value="${esc(scanCfg().model)}"></div>
+        <p class="hint">The key is stored only in this browser and is never included in backups. Anyone using this browser can use it, so don't add it on a shared computer.</p>
+        <div class="row"><button class="btn small primary" id="sc-save">Save scanner settings</button>${scanCfg().key ? `<button class="btn small danger" id="sc-clear">Remove key</button>` : ""}</div>
+      </div>
+    </div>
+  </div>`;
+  $("#st-save").onclick = async () => {
+    Object.assign(S.settings, {shopName: $("#st-name").value.trim(), address: $("#st-addr").value.trim(), phone: $("#st-phone").value.trim(), gstin: $("#st-gst").value.trim(), prefix: $("#st-prefix").value, footer: $("#st-foot").value.trim()});
+    await putSettings(); toast("Shop details saved");
+  };
+  $("#lv-add").onclick = () => { $("#lv-list").insertAdjacentHTML("beforeend", `<div class="row" style="flex-wrap:nowrap"><input value="" data-lv="new" placeholder="e.g. Dealer" aria-label="New price list name"></div>`); $("#lv-list input:last-child").focus(); };
+  $$("[data-lvdel]").forEach(b => b.onclick = async () => {
+    const l = S.settings.levels[+b.dataset.lvdel];
+    if (!(await askConfirm(`Remove the “${l}” price list? Prices saved for it stay on products but won't be used.`, "Remove"))) return;
+    S.settings.levels = S.settings.levels.filter((_, i) => i !== +b.dataset.lvdel); await putSettings(); renderSettings();
+  });
+  $("#lv-save").onclick = async () => {
+    const old = S.settings.levels; const next = []; const renames = [];
+    $$("[data-lv]").forEach(inp => { const v = inp.value.trim(); if (!v) return; if (inp.dataset.lv !== "new") { const o = old[+inp.dataset.lv]; if (o !== v) renames.push([o, v]); } if (!next.includes(v)) next.push(v); });
+    if (!next.length) { toast("Keep at least one price list.", "due"); return; }
+    $("#lv-save").disabled = true;
+    for (const [o, v] of renames) {
+      for (const p of Object.values(S.products)) if (p.prices && o in p.prices) { const pr = {...p.prices, [v]: p.prices[o]}; delete pr[o]; await put("p", {...p, prices: pr}); }
+      for (const c of Object.values(S.customers)) if (c.level === o) await put("c", {...c, level: v});
+    }
+    S.settings.levels = next; await putSettings(); toast("Price lists saved"); renderSettings();
+  };
+  const dl = $("#bk-dl"); if (dl) dl.onclick = () => offerDownload(`Dukaan backup ${today()}.json`, JSON.stringify({app: "dukaan-bill-book", version: 1, products: S.products, customers: S.customers, invoices: S.invoices, payments: S.payments, settings: S.settings}, null, 1));
+  $("#sc-save").onclick = () => { saveScanCfg({key: $("#sc-key").value.trim(), model: $("#sc-model").value.trim() || "claude-sonnet-5-5"}); toast("Scanner settings saved"); renderSettings(); };
+  const scc = $("#sc-clear"); if (scc) scc.onclick = () => { saveScanCfg({...scanCfg(), key: ""}); toast("API key removed"); renderSettings(); };
+  $("#bk-up").onclick = () => { $("#restore-file").value = ""; $("#restore-file").click(); };
+}
+$("#restore-file").addEventListener("change", async e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  let d; try { d = JSON.parse(await f.text()); } catch (err) { toast("That file isn't a valid backup.", "due"); return; }
+  if (!d || d.app !== "dukaan-bill-book") { toast("That file isn't a backup from this app.", "due"); return; }
+  const n = ["products", "customers", "invoices", "payments"].reduce((s, k) => s + Object.keys(d[k] || {}).length, 0);
+  if (!(await askConfirm(`Restore ${n} records from this backup? Records with the same ID are replaced; nothing else is deleted.`, "Restore"))) return;
+  toast("Restoring… keep this page open.");
+  const kinds = {products: "p", customers: "c", invoices: "i", payments: "y"};
+  for (const [k, kk] of Object.entries(kinds)) for (const v of Object.values(d[k] || {})) if (v && v.id) await put(kk, v);
+  if (d.settings) { S.settings = {...DEFAULT_SETTINGS, ...d.settings}; await putSettings(); }
+  toast(`Restored ${n} records`); renderRoute();
+});
+
+/* ---------- start ---------- */
+initStore();
+</script>
+</body>
+</html>
